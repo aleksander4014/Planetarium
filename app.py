@@ -36,36 +36,51 @@ st.set_page_config(
 st.markdown("""
 <style>
     .main {
-        background: radial-gradient(circle at 50% 10%, #0d1527 0%, #050811 100%);
-        color: #e2e8f0;
+        background: radial-gradient(circle at 50% 10%, #122235 0%, #070d18 45%, #04070d 100%);
+        color: #edf6ff;
+    }
+    .stApp {
+        color: #edf6ff;
+    }
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0a1320 0%, #0d1c2d 100%);
+        border-right: 1px solid rgba(148, 163, 184, 0.24);
     }
     .stMetric {
-        background-color: rgba(15, 23, 42, 0.7);
-        border: 1px solid rgba(56, 189, 248, 0.2);
-        border-radius: 10px;
+        background: rgba(11, 18, 32, 0.9);
+        border: 1px solid rgba(96, 165, 250, 0.45);
+        border-radius: 12px;
         padding: 12px;
+        box-shadow: 0 0 0 1px rgba(14, 116, 144, 0.18);
     }
     .stAlert {
         border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.3);
     }
     .planet-card {
-        background: rgba(30, 41, 59, 0.6);
-        border-left: 4px solid #38bdf8;
+        background: rgba(15, 23, 42, 0.92);
+        border-left: 4px solid #7dd3fc;
+        color: #eaf6ff;
         padding: 12px 16px;
         border-radius: 0 8px 8px 0;
         margin-bottom: 10px;
+        box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.12);
     }
     .header-badge {
         display: inline-block;
-        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-        color: white;
-        padding: 4px 12px;
+        background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+        color: #03131f;
+        padding: 5px 12px;
         border-radius: 20px;
         font-size: 0.85rem;
-        font-weight: 600;
+        font-weight: 700;
         letter-spacing: 0.05em;
         text-transform: uppercase;
         margin-bottom: 8px;
+        box-shadow: 0 0 18px rgba(56, 189, 248, 0.35);
+    }
+    .stCaption, .stMarkdown p, .stMarkdown li, .stDataFrame, .stSelectbox label, .stTextInput label, .stDateInput label, .stTimeInput label {
+        color: #e2f0ff !important;
     }
 </style>
 """, unsafe_allow_html=True)
