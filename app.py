@@ -102,13 +102,8 @@ with st.sidebar:
         
     st.markdown("---")
     st.subheader("🕒 Czas obserwacji")
-    selected_date = st.date_input("Data obserwacji", datetime.date.today())
-    
-    # Funkcja parsująca elastyczny format wprowadzania godziny
-    st.markdown("---")
-    st.subheader("🕒 Czas obserwacji")
-    selected_date = st.date_input("Data obserwacji", datetime.date.today())
-    
+    selected_date = st.date_input("Data obserwacji", datetime.date.today(), key="selected_date")
+
     # Inicjalizacja domyślnego czasu w session_state (tylko przy pierwszym wejściu)
     if "user_time_str" not in st.session_state:
         st.session_state.user_time_str = datetime.datetime.utcnow().strftime("%H:%M")
