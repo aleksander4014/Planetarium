@@ -216,7 +216,7 @@ with tab_planets:
         st.markdown("---")
         
         # Tabela współrzędnych
-       def style_visibility(val):
+        def style_visibility(val):
             color = '#10b981' if 'Widoczny' in str(val) else '#ef4444'
             return f'color: {color}; font-weight: bold;'
 
