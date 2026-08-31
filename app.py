@@ -105,55 +105,48 @@ with st.sidebar:
     selected_date = st.date_input("Data obserwacji", datetime.date.today())
     
     # Funkcja parsująca elastyczny format wprowadzania godziny
-    def parse_quick_time(input_str: str, default_time: datetime.time) -> datetime.time:
-        """
-        Parsuje tekst na obiekt datetime.time.
-        Obsługuje: '1640' -> 16:40, '930' -> 09:30, '16' -> 16:00, '16:40' -> 16:40.
-        """
-        raw = input_str.strip().replace(":", "").replace(".", "").replace(" ", "")
-        if not raw:
-            return default_time
-        
+    st.markdown("---")
+    st.subheader("🕒 Czas obserwacji")
+    selected_date = st.date_input("Data obserwacji", datetime.date.today())
+    
+    # Inicjalizacja domyślnego czasu w session_state (tylko przy pierwszym wejściu)
+    if "user_time_str" not in st.session_state:
+        st.session_state.user_time_str = datetime.datetime.utcnow().strftime("%H:%M")
+
+    def parse_time_string(val: str) -> datetime.time:
+        cleaned = val.strip().replace(":", "").replace(".", "").replace(" ", "")
         try:
-            if raw.isdigit():
-                if len(raw) == 4:       # np. 1640 -> 16:40
-                    h, m = int(raw[:2]), int(raw[2:])
-                elif len(raw) == 3:     # np. 930 -> 09:30
-                    h, m = int(raw[:1]), int(raw[1:])
-                elif len(raw) <= 2:     # np. 16 -> 16:00
-                    h, m = int(raw), 0
+            if cleaned.isdigit():
+                if len(cleaned) == 4:     # np. 1750 -> 17:50
+                    h, m = int(cleaned[:2]), int(cleaned[2:])
+                elif len(cleaned) == 3:   # np. 930 -> 09:30
+                    h, m = int(cleaned[:1]), int(cleaned[1:])
+                elif len(cleaned) <= 2:   # np. 17 -> 17:00
+                    h, m = int(cleaned), 0
                 else:
-                    return default_time
+                    return datetime.time(20, 0)
             else:
-                # Obsługa tradycyjnego '16:40' lub '16.40'
-                parts = input_str.strip().replace(".", ":").split(":")
+                # Format tradycyjny 17:50 lub 17.50
+                parts = val.strip().replace(".", ":").split(":")
                 h = int(parts[0])
                 m = int(parts[1]) if len(parts) > 1 and parts[1] else 0
 
-            # Walidacja zakresów czasu
             if 0 <= h <= 23 and 0 <= m <= 59:
                 return datetime.time(h, m)
         except Exception:
             pass
-        return default_time
+        return datetime.time(20, 0)
 
-    # Domyślny aktualny czas UTC
-    now_utc = datetime.datetime.utcnow().time()
-    default_str = now_utc.strftime("%H%M")
-    
-    time_input_str = st.text_input(
-        "Godzina obserwacji (UTC):",
-        value=default_str,
-        max_chars=5,
-        help="Wpisz np. 1640 (dla 16:40), 930 (dla 09:30) lub 21 (dla 21:00)."
+    time_input = st.text_input(
+        "Godzina (UTC):",
+        value=st.session_state.user_time_str,
+        help="Wpisz np. 1750 (dla 17:50), 930 (dla 09:30) lub 21 (dla 21:00)"
     )
     
-    # Wyznaczenie sparsowanego czasu
-    parsed_time = parse_quick_time(time_input_str, now_utc)
+    st.session_state.user_time_str = time_input
+    parsed_time = parse_time_string(time_input)
     
-    # Wyświetlenie potwierdzenia ustawionego czasu
     st.caption(f"⏱️ Ustawiony czas: **{parsed_time.strftime('%H:%M')} UTC**")
-    
     obs_datetime = datetime.datetime.combine(selected_date, parsed_time)
     
     st.markdown("---")
@@ -188,6 +181,7 @@ tab_planets, tab_asteroids, tab_radar, tab_info = st.tabs([
 # ==============================================================================
 # MODUŁ 1: OBLICZENIA POZYCJI PLANET (EPHEMERIDES / SPERICAL ASTRONOMY)
 # ==============================================================================
+@st.cache_data(ttl=60)
 def calculate_planetary_positions(date_time):
     """
     Oblicza współrzędne horyzontalne (Azymut i Wysokość nad horyzontem - Alt/Az)
