@@ -108,50 +108,15 @@ with st.sidebar:
     if "user_time_str" not in st.session_state:
         st.session_state.user_time_str = datetime.datetime.utcnow().strftime("%H:%M")
 
-    def parse_time_string(val: str) -> datetime.time:
-        raw = (val or "").strip()
-        if not raw:
-            return datetime.time(0, 0)
-
-        # Obsługa wpisywania w czasie: 17:5 -> 17:05, 17:50 -> 17:50, 930 -> 09:30, 21 -> 21:00
-        try:
-            if ":" in raw or "." in raw:
-                parts = [p.strip() for p in raw.replace(".", ":").split(":")]
-                if len(parts) == 1:
-                    h, m = int(parts[0]), 0
-                elif len(parts) == 2:
-                    h = int(parts[0])
-                    m = int(parts[1]) if parts[1] else 0
-                else:
-                    raise ValueError
-            else:
-                cleaned = raw.replace(" ", "")
-                if not cleaned.isdigit():
-                    raise ValueError
-                if len(cleaned) == 4:     # np. 1750 -> 17:50
-                    h, m = int(cleaned[:2]), int(cleaned[2:])
-                elif len(cleaned) == 3:   # np. 930 -> 09:30
-                    h, m = int(cleaned[:1]), int(cleaned[1:])
-                elif len(cleaned) <= 2:   # np. 17 -> 17:00
-                    h, m = int(cleaned), 0
-                else:
-                    raise ValueError
-
-            if 0 <= h <= 23 and 0 <= m <= 59:
-                return datetime.time(h, m)
-        except Exception:
-            pass
-        return datetime.time(20, 0)
-
-    time_input = st.text_input(
+    time_input = st.time_input(
         "Godzina (UTC):",
-        value=st.session_state.user_time_str,
-        help="Wpisz np. 1750 (dla 17:50), 930 (dla 09:30) lub 21 (dla 21:00)"
+        value=datetime.datetime.strptime(st.session_state.user_time_str, "%H:%M").time(),
+        key="user_time_input"
     )
-    
-    st.session_state.user_time_str = time_input
-    parsed_time = parse_time_string(time_input)
-    
+
+    st.session_state.user_time_str = time_input.strftime("%H:%M")
+    parsed_time = time_input
+
     st.caption(f"⏱️ Ustawiony czas: **{parsed_time.strftime('%H:%M')} UTC**")
     obs_datetime = datetime.datetime.combine(selected_date, parsed_time)
     
