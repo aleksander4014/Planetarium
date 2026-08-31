@@ -1,0 +1,6 @@
+{
+  "name": "Silesia Sky Tracker",
+  "description": "Interaktywny Asystent Obserwatora dla Planetarium Śląskiego w Chorzowie – obliczenia pozycji planet (Alt/Az), radar asteroid NASA NeoWS i narzędzia astronomiczne.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

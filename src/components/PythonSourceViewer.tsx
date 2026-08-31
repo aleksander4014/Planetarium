@@ -1,0 +1,633 @@
+import React, { useState } from 'react';
+import { Copy, Check, Download, FileCode, Terminal, Key, Rocket, Sparkles, BookOpen } from 'lucide-react';
+
+export const PythonSourceViewer: React.FC = () => {
+  const [copiedApp, setCopiedApp] = useState(false);
+  const [copiedReq, setCopiedReq] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<'app' | 'requirements' | 'nasa_guide' | 'render_guide'>('app');
+
+  const appPyCode = `"""
+Silesia Sky Tracker - Interaktywny Asystent Obserwatora
+Dedykowane dla: Planetarium - Śląski Park Nauki w Chorzowie
+Współrzędne stacji bazowej: 50.2911° N, 18.9922° E (Park Śląski, Chorzów)
+
+Autor: Inżynier Automatyki / Kandydat do zespołu technicznego Planetarium Śląskiego
+Technologie: Python, Streamlit, Ephem / Astropy, NASA NeoWS API, Pandas, Plotly
+"""
+
+import datetime
+import os
+import requests
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+
+# Próba importu biblioteki astronomicznej ephem (szybkie i precyzyjne obliczenia efemeryd)
+try:
+    import ephem
+    HAS_EPHEM = True
+except ImportError:
+    HAS_EPHEM = False
+
+# ==============================================================================
+# KONFIGURACJA STRONY STREAMLIT & MOTYW OBSERWATORIUM (DARK MODE)
+# ==============================================================================
+st.set_page_config(
+    page_title="Silesia Sky Tracker | Planetarium Śląskie",
+    page_icon="🔭",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Niestandardowy styl CSS dla klimatu nowoczesnego obserwatorium astronomicznego
+st.markdown("""
+<style>
+    .main {
+        background: radial-gradient(circle at 50% 10%, #0d1527 0%, #050811 100%);
+        color: #e2e8f0;
+    }
+    .stMetric {
+        background-color: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(56, 189, 248, 0.2);
+        border-radius: 10px;
+        padding: 12px;
+    }
+    .stAlert {
+        border-radius: 8px;
+    }
+    .planet-card {
+        background: rgba(30, 41, 59, 0.6);
+        border-left: 4px solid #38bdf8;
+        padding: 12px 16px;
+        border-radius: 0 8px 8px 0;
+        margin-bottom: 10px;
+    }
+    .header-badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ==============================================================================
+# STAŁE ASTRONOMICZNE I WSPÓŁRZĘDNE OBSERWATORA (CHORZÓW)
+# ==============================================================================
+CHORZOW_LAT = '50.2911'       # Szerokość geograficzna [N] (Planetarium Śląskie)
+CHORZOW_LON = '18.9922'       # Długość geograficzna [E]
+CHORZOW_ELEVATION = 320       # Wysokość n.p.m. [m] (Wzgórze Parku Śląskiego)
+
+# ==============================================================================
+# PASEK BOCZNY - PARAMETRY I KLUCZ API
+# ==============================================================================
+with st.sidebar:
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/NASA_logo.svg/300px-NASA_logo.svg.png", width=110)
+    st.title("⚙️ Parametry Stacji")
+    st.caption("Stacja Obserwacyjna: **Planetarium Śląskie, Chorzów**")
+    
+    st.markdown("---")
+    st.subheader("🔑 Konfiguracja NASA API")
+    
+    # Pobieranie klucza ze zmiennych środowiskowych lub pola tekstowego użytkownika
+    env_api_key = os.getenv("NASA_API_KEY", "")
+    nasa_api_key = st.text_input(
+        "Klucz NASA API:",
+        value=env_api_key if env_api_key else "DEMO_KEY",
+        type="password" if env_api_key else "default",
+        help="Wpisz własny klucz z api.nasa.gov lub pozostaw 'DEMO_KEY' do testów."
+    )
+    
+    if nasa_api_key == "DEMO_KEY":
+        st.info("ℹ️ Używasz limitowanego klucza \`DEMO_KEY\` (30 zapytań/godz.).")
+    else:
+        st.success("✅ Własny klucz API aktywny!")
+        
+    st.markdown("---")
+    st.subheader("🕒 Czas obserwacji")
+    selected_date = st.date_input("Data obserwacji", datetime.date.today())
+    selected_time = st.time_input("Godzina (UTC)", datetime.datetime.utcnow().time())
+    obs_datetime = datetime.datetime.combine(selected_date, selected_time)
+    
+    st.markdown("---")
+    st.markdown("""
+    **Profil kandydata:**
+    - 📐 Geometria sferyczna & Astrometria
+    - 🤖 Inżynieria Automatyki i Robotyki
+    - 🐍 Python / Streamlit / API Integration
+    """)
+
+# ==============================================================================
+# SEKCJA POWITALNA (Nawiązanie do Parku Śląskiego i Planetarium)
+# ==============================================================================
+st.markdown('<div class="header-badge">Śląski Park Nauki • Chorzów</div>', unsafe_allow_html=True)
+st.title("🔭 Silesia Sky Tracker")
+st.subheader("Interaktywny System Pozycjonowania Ciał Niebieskich & Radar Zagrożeń Kosmicznych")
+
+st.markdown(f"""
+Witaj w systemie telemetrycznym sprofilowanym dla **Planetarium - Śląskiego Parku Nauki** 
+(Współrzędne: **{CHORZOW_LAT}° N, {CHORZOW_LON}° E**, Wzgórze w Parku Śląskim). 
+Aplikacja automatycznie przelicza sferyczne współrzędne horyzontalne (**Alt/Az**) dla teleskopów oraz 
+monitoruje zbliżenia obiektów NEO (Near Earth Objects) w czasie rzeczywistym.
+""")
+
+tab_planets, tab_asteroids, tab_radar, tab_info = st.tabs([
+    "🪐 Widoczność Planet (Alt/Az)",
+    "☄️ Radar Asteroid (NASA NeoWS)",
+    "🎯 Sferyczna Mapa Nieba (Wizualizacja)",
+    "📐 Metodologia Matematyczna"
+])
+
+# ==============================================================================
+# MODUŁ 1: OBLICZENIA POZYCJI PLANET (EPHEMERIDES / SPHERICAL ASTRONOMY)
+# ==============================================================================
+def calculate_planetary_positions(date_time):
+    """
+    Oblicza współrzędne horyzontalne (Azymut i Wysokość nad horyzontem - Alt/Az)
+    dla planet Układu Słonecznego z punktu widzenia Planetarium Śląskiego w Chorzowie.
+    """
+    planets_data = []
+    
+    if HAS_EPHEM:
+        observer = ephem.Observer()
+        observer.lat = CHORZOW_LAT
+        observer.lon = CHORZOW_LON
+        observer.elevation = CHORZOW_ELEVATION
+        observer.date = date_time
+        
+        celestial_bodies = {
+            "Księżyc 🌕": ephem.Moon(),
+            "Merkury ☿": ephem.Mercury(),
+            "Wenus ♀": ephem.Venus(),
+            "Mars ♂": ephem.Mars(),
+            "Jowisz ♃": ephem.Jupiter(),
+            "Saturn ♄": ephem.Saturn(),
+            "Uran ♅": ephem.Uranus(),
+            "Neptun ♆": ephem.Neptune()
+        }
+        
+        for name, body in celestial_bodies.items():
+            body.compute(observer)
+            
+            # Konwersja kątów z radianów na stopnie
+            altitude_deg = float(body.alt) * 180.0 / 3.141592653589793
+            azimuth_deg = float(body.az) * 180.0 / 3.141592653589793
+            
+            is_visible = altitude_deg > 0
+            
+            # Określenie kierunku świata na podstawie azymutu
+            directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'N']
+            dir_index = int((azimuth_deg + 22.5) // 45) % 8
+            compass_dir = directions[dir_index]
+            
+            planets_data.append({
+                "Obiekt": name,
+                "Wysokość (Alt) [°]": round(altitude_deg, 2),
+                "Azymut (Az) [°]": round(azimuth_deg, 2),
+                "Kierunek": compass_dir,
+                "Jasność (Mag)": round(float(body.mag), 2) if hasattr(body, 'mag') else "—",
+                "Status": "🟢 Widoczny (Nad horyzontem)" if is_visible else "🔴 Pod horyzontem",
+                "Widoczny": is_visible
+            })
+    else:
+        st.warning("Zainstaluj pakiet 'ephem', aby uzyskać precyzyjne efemerydy.")
+        
+    return pd.DataFrame(planets_data)
+
+with tab_planets:
+    st.markdown("### 🔭 Pozycje Ciał Niebieskich z Planetarium Śląskiego")
+    st.caption(f"Czas kalkulacji: **{obs_datetime.strftime('%Y-%m-%d %H:%M:%S UTC')}**")
+    
+    df_planets = calculate_planetary_positions(obs_datetime)
+    
+    if not df_planets.empty:
+        visible_count = int(df_planets['Widoczny'].sum())
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Łącznie śledzonych ciał", len(df_planets))
+        col2.metric("Aktualnie nad horyzontem", f"{visible_count} obiektów", delta=f"{visible_count} widocznych")
+        
+        best_planet = df_planets[df_planets['Widoczny']].sort_values(by="Wysokość (Alt) [°]", ascending=False)
+        if not best_planet.empty:
+            col3.metric("Najwyżej na niebie", best_planet.iloc[0]['Obiekt'], f"Alt: {best_planet.iloc[0]['Wysokość (Alt) [°]']}°")
+        else:
+            col3.metric("Najwyżej na niebie", "Brak ciał nad horyzontem", "—")
+        
+        st.markdown("---")
+        
+        def style_visibility(val):
+            color = '#10b981' if 'Widoczny' in str(val) else '#ef4444'
+            return f'color: {color}; font-weight: bold;'
+
+        styled_df = df_planets.drop(columns=['Widoczny']).style.applymap(
+            style_visibility, subset=['Status']
+        )
+        st.dataframe(styled_df, use_container_width=True)
+        
+        st.info("""
+        💡 **Wskazówka montażowa (Alt/Az do Ra/Dec):** Współrzędne horyzontalne są bezpośrednio 
+        wykorzystywane przez sterowniki silników krokowych montażu azymutalnego w kopule Planetarium.
+        """)
+
+# ==============================================================================
+# MODUŁ 2: INTEGRACJA Z NASA NeoWS (RADAR ASTEROID)
+# ==============================================================================
+@st.cache_data(ttl=1800)  # Cache na 30 minut dla optymalizacji limitu zapytań
+def fetch_neo_asteroids(api_key, date_str):
+    url = f"https://api.nasa.gov/neo/rest/v1/feed?start_date={date_str}&end_date={date_str}&api_key={api_key}"
+    
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            neo_objects = data.get("near_earth_objects", {}).get(date_str, [])
+            
+            parsed_list = []
+            for item in neo_objects:
+                name = item.get("name", "Nieznana")
+                is_hazardous = item.get("is_potentially_hazardous_asteroid", False)
+                
+                diam_min = item["estimated_diameter"]["meters"]["estimated_diameter_min"]
+                diam_max = item["estimated_diameter"]["meters"]["estimated_diameter_max"]
+                avg_diameter = (diam_min + diam_max) / 2.0
+                
+                close_approach = item.get("close_approach_data", [{}])[0]
+                miss_distance_km = float(close_approach.get("miss_distance", {}).get("kilometers", 0))
+                miss_distance_ld = float(close_approach.get("miss_distance", {}).get("lunar", 0))
+                velocity_kmh = float(close_approach.get("relative_velocity", {}).get("kilometers_per_hour", 0))
+                velocity_kms = velocity_kmh / 3600.0
+                
+                parsed_list.append({
+                    "Nazwa Asteroidy": name,
+                    "Odległość [km]": round(miss_distance_km, 0),
+                    "Dystans Księżycowy [LD]": round(miss_distance_ld, 2),
+                    "Prędkość [km/s]": round(velocity_kms, 2),
+                    "Prędkość [km/h]": round(velocity_kmh, 0),
+                    "Szac. Średnica [m]": round(avg_diameter, 1),
+                    "Potencjalnie Niebezpieczna (PHA)": "⚠️ TAK" if is_hazardous else "🛡️ Bezpieczna",
+                    "Hazardous_Bool": is_hazardous
+                })
+            
+            return pd.DataFrame(parsed_list), None
+        else:
+            return pd.DataFrame(), f"Błąd NASA API: Kod HTTP {response.status_code} ({response.reason})"
+    except Exception as e:
+        return pd.DataFrame(), f"Błąd połączenia: {str(e)}"
+
+with tab_asteroids:
+    st.markdown("### ☄️ Obiekty Bliskie Ziemi (NASA Near Earth Object Web Service)")
+    date_query = selected_date.strftime("%Y-%m-%d")
+    
+    with st.spinner("Pobieranie telemetrii z NASA JPL..."):
+        df_neo, error = fetch_neo_asteroids(nasa_api_key, date_query)
+    
+    if error:
+        st.error(f"❌ {error}")
+        st.info("Sprawdź poprawność klucza API w panelu bocznym lub użyj \`DEMO_KEY\`.")
+    elif df_neo.empty:
+        st.warning(f"Brak zarejestrowanych przelotów NEO w bazie NASA na dzień {date_query}.")
+    else:
+        total_neo = len(df_neo)
+        hazardous_count = int(df_neo['Hazardous_Bool'].sum())
+        closest_neo = df_neo.sort_values(by="Odległość [km]").iloc[0]
+        fastest_neo = df_neo.sort_values(by="Prędkość [km/s]", ascending=False).iloc[0]
+        
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Wszystkie obiekty dzisiaj", total_neo)
+        c2.metric("Potencjalnie niebezpieczne (PHA)", hazardous_count, delta="Zagrożenie" if hazardous_count > 0 else "Brak", delta_color="inverse")
+        c3.metric("Najbliższy obiekt", f"{closest_neo['Dystans Księżycowy [LD]']} LD", f"{closest_neo['Nazwa Asteroidy']}")
+        c4.metric("Najszybszy obiekt", f"{fastest_neo['Prędkość [km/s]']} km/s", f"{fastest_neo['Nazwa Asteroidy']}")
+        
+        st.markdown("---")
+        
+        col_f1, col_f2 = st.columns([1, 2])
+        with col_f1:
+            filter_hazard = st.checkbox("Pokaż tylko potencjalnie niebezpieczne (PHA)")
+        with col_f2:
+            sort_by = st.selectbox("Sortuj według:", ["Odległość [km]", "Prędkość [km/s]", "Szac. Średnica [m]"])
+            
+        display_df = df_neo.copy()
+        if filter_hazard:
+            display_df = display_df[display_df['Hazardous_Bool'] == True]
+            
+        display_df = display_df.sort_values(by=sort_by)
+        
+        st.dataframe(
+            display_df.drop(columns=['Hazardous_Bool', 'Prędkość [km/h]']),
+            use_container_width=True
+        )
+        
+        st.markdown("#### 📊 Analiza Kinematyczna Obiektów")
+        fig_scatter = px.scatter(
+            df_neo,
+            x="Odległość [km]",
+            y="Prędkość [km/s]",
+            size="Szac. Średnica [m]",
+            color="Potencjalnie Niebezpieczna (PHA)",
+            hover_name="Nazwa Asteroidy",
+            title=f"Rozkład Asteroid NEO ({date_query})",
+            color_discrete_map={"⚠️ TAK": "#ef4444", "🛡️ Bezpieczna": "#0ea5e9"},
+            template="plotly_dark"
+        )
+        fig_scatter.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)")
+        st.plotly_chart(fig_scatter, use_container_width=True)
+
+# ==============================================================================
+# MODUŁ 3: WIZUALIZACJA SFERYCZNA (RADAR PLANETARNY / DOME CHART)
+# ==============================================================================
+with tab_radar:
+    st.markdown("### 🎯 Sferyczna Projekcja Kopuły Nieba (Alt-Az)")
+    st.caption("Współrzędne biegunowe: Promień = Odległość zenitalna (90° - Alt), Kąt = Azymut (Az)")
+    
+    if not df_planets.empty:
+        radar_df = df_planets.copy()
+        radar_df['Zenith_Angle'] = 90.0 - radar_df['Wysokość (Alt) [°]']
+        visible_df = radar_df[radar_df['Widoczny'] == True]
+        
+        if visible_df.empty:
+            st.info("Obecnie żadne z głównych ciał nie znajduje się nad horyzontem w Chorzowie.")
+        else:
+            fig_polar = go.Figure()
+            fig_polar.add_trace(go.Scatterpolar(
+                r=visible_df['Zenith_Angle'],
+                theta=visible_df['Azymut (Az) [°]'],
+                mode='markers+text',
+                text=visible_df['Obiekt'],
+                textposition="top center",
+                marker=dict(
+                    size=14,
+                    color=visible_df['Wysokość (Alt) [°]'],
+                    colorscale='Viridis',
+                    showscale=True,
+                    colorbar=dict(title="Alt [°]")
+                ),
+                hoverinfo="text",
+                hovertext=[
+                    f"{row['Obiekt']}<br>Alt: {row['Wysokość (Alt) [°]']}°<br>Az: {row['Azymut (Az) [°]']}° ({row['Kierunek']})"
+                    for _, row in visible_df.iterrows()
+                ]
+            ))
+            
+            fig_polar.update_layout(
+                template="plotly_dark",
+                polar=dict(
+                    angularaxis=dict(
+                        direction="clockwise",
+                        rotation=90,
+                        tickvals=[0, 45, 90, 135, 180, 225, 270, 315],
+                        ticktext=['N (0°)', 'NE', 'E (90°)', 'SE', 'S (180°)', 'SW', 'W (270°)', 'NW']
+                    ),
+                    radialaxis=dict(
+                        range=[0, 90],
+                        tickvals=[0, 30, 60, 90],
+                        ticktext=['Zenit (90°)', '60°', '30°', 'Horyzont (0°)']
+                    ),
+                    bgcolor="rgba(15, 23, 42, 0.8)"
+                ),
+                paper_bgcolor="rgba(0,0,0,0)",
+                showlegend=False,
+                height=550
+            )
+            
+            st.plotly_chart(fig_polar, use_container_width=True)
+
+# ==============================================================================
+# MODUŁ 4: NOTY INŻYNIERSKIE I METODOLOGIA ASTRONOMICZNA
+# ==============================================================================
+with tab_info:
+    st.markdown("""
+    ### 📐 Noty Techniczne i Astrometria dla Planetarium Śląskiego
+    
+    Aplikacja została zaprojektowana jako demonstrator kompetencji inżynierskich w obszarze:
+    
+    #### 1. Transformacja Współrzędnych Astronomicznych
+    - Przeliczanie z układu równikowego równonocnego $(\\\\alpha, \\\\delta)$ (Rektascensja, Deklinacja) do układu horyzontalnego $(A, h)$ (Azymut, Wysokość).
+    - **Wzory transformacyjne:**
+      $$\\\\sin(h) = \\\\sin(\\\\phi)\\\\sin(\\\\delta) + \\\\cos(\\\\phi)\\\\cos(\\\\delta)\\\\cos(H)$$
+      $$\\\\cos(A) = \\\\frac{\\\\sin(\\\\delta) - \\\\sin(\\\\phi)\\\\sin(h)}{\\\\cos(\\\\phi)\\\\cos(h)}$$
+      gdzie: $\\\\phi$ = szerokość geograficzna Chorzowa ($50.2911^{\\\\circ}$), $H$ = kąt godzinny obiektu.
+      
+    #### 2. Architektura Systemu i Integracja API
+    - **Klient REST API:** Asynchroniczne odpytywanie bazy NASA JPL SSD (Solar System Dynamics).
+    - **Obsługa błędów i Cache:** \`st.cache_data\` minimalizuje liczbę zapytań i chroni przed limitami \`RATE_LIMIT_EXCEEDED\`.
+    - **Zastosowanie w automatyce:** Algorytmy wyznaczania pozycji obiektów mogą posłużyć do bezpośredniego sterowania serwonapędami kopuły i teleskopów w Planetarium Śląskim.
+    """)
+
+st.markdown("---")
+st.caption("🌌 **Silesia Sky Tracker** | Projekt zrealizowany na potrzeby rekrutacji do Planetarium Śląskiego w Chorzowie.")
+`;
+
+  const reqText = `streamlit>=1.30.0
+ephem>=4.1.5
+requests>=2.31.0
+pandas>=2.0.0
+plotly>=5.18.0
+`;
+
+  const copyToClipboard = (text: string, type: 'app' | 'req') => {
+    navigator.clipboard.writeText(text);
+    if (type === 'app') {
+      setCopiedApp(true);
+      setTimeout(() => setCopiedApp(false), 2000);
+    } else {
+      setCopiedReq(true);
+      setTimeout(() => setCopiedReq(false), 2000);
+    }
+  };
+
+  const downloadFile = (filename: string, content: string) => {
+    const element = document.createElement("a");
+    const file = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    element.href = URL.createObjectURL(file);
+    element.download = filename;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Pasek wyboru podstrony w edytorze kodu */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setActiveSubTab('app')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-1.5 transition ${
+              activeSubTab === 'app'
+                ? 'bg-cyan-950 text-cyan-300 border border-cyan-800'
+                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <FileCode className="w-3.5 h-3.5 text-cyan-400" />
+            app.py (Główny Kod)
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('requirements')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-1.5 transition ${
+              activeSubTab === 'requirements'
+                ? 'bg-cyan-950 text-cyan-300 border border-cyan-800'
+                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Terminal className="w-3.5 h-3.5 text-amber-400" />
+            requirements.txt
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('nasa_guide')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-sans font-medium flex items-center gap-1.5 transition ${
+              activeSubTab === 'nasa_guide'
+                ? 'bg-cyan-950 text-cyan-300 border border-cyan-800'
+                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Key className="w-3.5 h-3.5 text-emerald-400" />
+            Instrukcja NASA API
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('render_guide')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-sans font-medium flex items-center gap-1.5 transition ${
+              activeSubTab === 'render_guide'
+                ? 'bg-cyan-950 text-cyan-300 border border-cyan-800'
+                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Rocket className="w-3.5 h-3.5 text-purple-400" />
+            Wdrożenie na Render
+          </button>
+        </div>
+
+        {/* Akcje pobierania */}
+        <div className="flex items-center gap-2">
+          {activeSubTab === 'app' && (
+            <>
+              <button
+                onClick={() => copyToClipboard(appPyCode, 'app')}
+                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg flex items-center gap-1.5 transition"
+              >
+                {copiedApp ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedApp ? 'Skopiowano!' : 'Kopiuj kod'}
+              </button>
+              <button
+                onClick={() => downloadFile('app.py', appPyCode)}
+                className="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white text-xs rounded-lg flex items-center gap-1.5 transition"
+              >
+                <Download className="w-3.5 h-3.5" /> Pobierz app.py
+              </button>
+            </>
+          )}
+
+          {activeSubTab === 'requirements' && (
+            <>
+              <button
+                onClick={() => copyToClipboard(reqText, 'req')}
+                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg flex items-center gap-1.5 transition"
+              >
+                {copiedReq ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedReq ? 'Skopiowano!' : 'Kopiuj'}
+              </button>
+              <button
+                onClick={() => downloadFile('requirements.txt', reqText)}
+                className="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white text-xs rounded-lg flex items-center gap-1.5 transition"
+              >
+                <Download className="w-3.5 h-3.5" /> Pobierz requirements.txt
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Treść wybranej zakładki */}
+      {activeSubTab === 'app' && (
+        <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
+          <div className="bg-slate-900/90 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between text-xs font-mono text-slate-400">
+            <span>🐍 app.py • Streamlit + PyEphem + NASA REST API</span>
+            <span>Kod gotowy do uruchomienia: streamlit run app.py</span>
+          </div>
+          <pre className="p-4 text-xs font-mono text-slate-200 overflow-x-auto max-h-[600px] leading-relaxed select-all">
+            <code>{appPyCode}</code>
+          </pre>
+        </div>
+      )}
+
+      {activeSubTab === 'requirements' && (
+        <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
+          <div className="bg-slate-900/90 px-4 py-2.5 border-b border-slate-800 text-xs font-mono text-slate-400">
+            📦 requirements.txt (Wszystkie zależności dla Pythona)
+          </div>
+          <pre className="p-4 text-xs font-mono text-amber-300 leading-relaxed">
+            <code>{reqText}</code>
+          </pre>
+        </div>
+      )}
+
+      {activeSubTab === 'nasa_guide' && (
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 space-y-4 text-sm text-slate-300 leading-relaxed">
+          <div className="flex items-center gap-2 text-white font-bold text-base border-b border-slate-800 pb-3">
+            <Key className="w-5 h-5 text-emerald-400" />
+            Jak wygenerować i skonfigurować darmowy klucz NASA API
+          </div>
+
+          <ol className="list-decimal list-inside space-y-3">
+            <li>
+              <strong>Wejdź na oficjalny portal NASA:</strong> Otwórz w przeglądarce stronę{' '}
+              <a href="https://api.nasa.gov" target="_blank" rel="noreferrer" className="text-cyan-400 underline font-mono">
+                https://api.nasa.gov
+              </a>.
+            </li>
+            <li>
+              <strong>Wypełnij krótki formularz „Generate API Key”:</strong>
+              <ul className="list-disc list-inside ml-6 mt-1 text-slate-400 text-xs space-y-1">
+                <li>First Name / Last Name (Twoje imię i nazwisko)</li>
+                <li>Email (Twój adres e-mail)</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Odbierz swój unikalny klucz:</strong> Klucz wyświetli się natychmiast na ekranie oraz zostanie wysłany na podany e-mail (np. ciąg znaków w stylu <code className="text-amber-300 bg-slate-950 px-1 py-0.5 rounded font-mono">AbCd123XyZ...</code>).
+            </li>
+            <li>
+              <strong>Gdzie wkleić klucz w aplikacji:</strong>
+              <ul className="list-disc list-inside ml-6 mt-1 text-slate-400 text-xs space-y-1">
+                <li><strong>W interfejsie Streamlit:</strong> Wpisz klucz w polu <em>„Klucz NASA API”</em> na pasku bocznym (Sidebar).</li>
+                <li><strong>W zmiennych środowiskowych (lokalnie):</strong> <code className="text-cyan-300 font-mono">export NASA_API_KEY="twój_klucz"</code> (Linux/macOS) lub w pliku <code className="text-cyan-300 font-mono">.env</code>.</li>
+                <li><strong>Na platformie Render / Streamlit Cloud:</strong> W zakładce <em>Environment Variables</em> dodaj zmienną o nazwie <code className="text-cyan-300 font-mono">NASA_API_KEY</code> i wartości Twojego klucza.</li>
+              </ul>
+            </li>
+          </ol>
+        </div>
+      )}
+
+      {activeSubTab === 'render_guide' && (
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 space-y-4 text-sm text-slate-300 leading-relaxed">
+          <div className="flex items-center gap-2 text-white font-bold text-base border-b border-slate-800 pb-3">
+            <Rocket className="w-5 h-5 text-purple-400" />
+            Wdrożenie (Deployment) na darmowej platformie Render.com
+          </div>
+
+          <div className="space-y-3">
+            <p>
+              Platforma Render umożliwia darmowe hostowanie aplikacji Python Streamlit z publicznym adresem URL, idealnym do CV:
+            </p>
+            <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-2 font-mono text-xs text-slate-300">
+              <div className="text-cyan-400 font-semibold">// Parametry Web Service na Render.com:</div>
+              <div><strong>Runtime:</strong> Python 3</div>
+              <div><strong>Build Command:</strong> pip install -r requirements.txt</div>
+              <div><strong>Start Command:</strong> streamlit run app.py --server.port $PORT --server.address 0.0.0.0</div>
+            </div>
+            <p className="text-xs text-slate-400">
+              Po wdrożeniu otrzymasz link (np. <code className="text-cyan-300">https://silesia-sky-tracker.onrender.com</code>), który możesz załączyć do listu motywacyjnego dla Planetarium Śląskiego.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
