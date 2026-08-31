@@ -81,26 +81,24 @@ CHORZOW_ELEVATION = 320       # Wysokość n.p.m. [m] (Wzgórze Parku Śląskieg
 # PASEK BOCZNY - PARAMETRY I KLUCZ API
 # ==============================================================================
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/NASA_logo.svg/300px-NASA_logo.svg.png", width=110)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/NASA_logo.svg/300px-NASA_logo.svg.png", width=100)
     st.title("⚙️ Parametry Stacji")
-    st.caption("Stacja Obserwacyjna: **Planetarium Śląskie, Chorzów**")
+    st.caption("Stacja: **Planetarium Śląskie, Chorzów**")
     
     st.markdown("---")
-    st.subheader("🔑 Konfiguracja NASA API")
+    st.subheader("🔑 Połączenie NASA API")
     
-    # Pobieranie klucza ze zmiennych środowiskowych lub pola tekstowego użytkownika
-    env_api_key = os.getenv("NASA_API_KEY", "")
-    nasa_api_key = st.text_input(
-        "Klucz NASA API:",
-        value=env_api_key if env_api_key else "DEMO_KEY",
-        type="password" if env_api_key else "default",
-        help="Wpisz własny klucz z api.nasa.gov lub pozostaw 'DEMO_KEY' do testów."
-    )
+    # Bezpieczne pobranie klucza ze zmiennych środowiskowych serwera (np. Render)
+    server_api_key = os.getenv("NASA_API_KEY", "").strip()
     
-    if nasa_api_key == "DEMO_KEY":
-        st.info("ℹ️ Używasz limitowanego klucza `DEMO_KEY` (30 zapytań/godz.).")
+    if server_api_key:
+        # Klucz jest bezpiecznie wczytany z serwera - nie pokazujemy go w UI
+        nasa_api_key = server_api_key
+        st.success("🔒 Klucz NASA API: **Autoryzowany (Klucz serwera)**")
     else:
-        st.success("✅ Własny klucz API aktywny!")
+        # Fallback gdy zmienna środowiskowa nie jest ustawiona
+        nasa_api_key = "DEMO_KEY"
+        st.info("ℹ️ Brak zmiennej `NASA_API_KEY` – używam limitowanego `DEMO_KEY`.")
         
     st.markdown("---")
     st.subheader("🕒 Czas obserwacji")
@@ -110,10 +108,10 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("""
-    **Profil kandydata:**
+    **Profil inżynierski:**
     - 📐 Geometria sferyczna & Astrometria
-    - 🤖 Inżynieria Automatyki i Robotyki
-    - 🐍 Python / Streamlit / API Integration
+    - 🤖 Automatyka napędów montażu Alt-Az
+    - 🐍 Python / Streamlit / REST API
     """)
 
 # ==============================================================================
