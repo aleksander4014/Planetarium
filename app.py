@@ -103,8 +103,58 @@ with st.sidebar:
     st.markdown("---")
     st.subheader("🕒 Czas obserwacji")
     selected_date = st.date_input("Data obserwacji", datetime.date.today())
-    selected_time = st.time_input("Godzina (UTC)", datetime.datetime.utcnow().time())
-    obs_datetime = datetime.datetime.combine(selected_date, selected_time)
+    
+    # Funkcja parsująca elastyczny format wprowadzania godziny
+    def parse_quick_time(input_str: str, default_time: datetime.time) -> datetime.time:
+        """
+        Parsuje tekst na obiekt datetime.time.
+        Obsługuje: '1640' -> 16:40, '930' -> 09:30, '16' -> 16:00, '16:40' -> 16:40.
+        """
+        raw = input_str.strip().replace(":", "").replace(".", "").replace(" ", "")
+        if not raw:
+            return default_time
+        
+        try:
+            if raw.isdigit():
+                if len(raw) == 4:       # np. 1640 -> 16:40
+                    h, m = int(raw[:2]), int(raw[2:])
+                elif len(raw) == 3:     # np. 930 -> 09:30
+                    h, m = int(raw[:1]), int(raw[1:])
+                elif len(raw) <= 2:     # np. 16 -> 16:00
+                    h, m = int(raw), 0
+                else:
+                    return default_time
+            else:
+                # Obsługa tradycyjnego '16:40' lub '16.40'
+                parts = input_str.strip().replace(".", ":").split(":")
+                h = int(parts[0])
+                m = int(parts[1]) if len(parts) > 1 and parts[1] else 0
+
+            # Walidacja zakresów czasu
+            if 0 <= h <= 23 and 0 <= m <= 59:
+                return datetime.time(h, m)
+        except Exception:
+            pass
+        return default_time
+
+    # Domyślny aktualny czas UTC
+    now_utc = datetime.datetime.utcnow().time()
+    default_str = now_utc.strftime("%H%M")
+    
+    time_input_str = st.text_input(
+        "Godzina obserwacji (UTC):",
+        value=default_str,
+        max_chars=5,
+        help="Wpisz np. 1640 (dla 16:40), 930 (dla 09:30) lub 21 (dla 21:00)."
+    )
+    
+    # Wyznaczenie sparsowanego czasu
+    parsed_time = parse_quick_time(time_input_str, now_utc)
+    
+    # Wyświetlenie potwierdzenia ustawionego czasu
+    st.caption(f"⏱️ Ustawiony czas: **{parsed_time.strftime('%H:%M')} UTC**")
+    
+    obs_datetime = datetime.datetime.combine(selected_date, parsed_time)
     
     st.markdown("---")
     st.markdown("""
