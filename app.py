@@ -114,9 +114,25 @@ with st.sidebar:
         st.session_state.user_time_str = datetime.datetime.utcnow().strftime("%H:%M")
 
     def parse_time_string(val: str) -> datetime.time:
-        cleaned = val.strip().replace(":", "").replace(".", "").replace(" ", "")
+        raw = (val or "").strip()
+        if not raw:
+            return datetime.time(0, 0)
+
+        # Obsługa wpisywania w czasie: 17:5 -> 17:05, 17:50 -> 17:50, 930 -> 09:30, 21 -> 21:00
         try:
-            if cleaned.isdigit():
+            if ":" in raw or "." in raw:
+                parts = [p.strip() for p in raw.replace(".", ":").split(":")]
+                if len(parts) == 1:
+                    h, m = int(parts[0]), 0
+                elif len(parts) == 2:
+                    h = int(parts[0])
+                    m = int(parts[1]) if parts[1] else 0
+                else:
+                    raise ValueError
+            else:
+                cleaned = raw.replace(" ", "")
+                if not cleaned.isdigit():
+                    raise ValueError
                 if len(cleaned) == 4:     # np. 1750 -> 17:50
                     h, m = int(cleaned[:2]), int(cleaned[2:])
                 elif len(cleaned) == 3:   # np. 930 -> 09:30
@@ -124,12 +140,7 @@ with st.sidebar:
                 elif len(cleaned) <= 2:   # np. 17 -> 17:00
                     h, m = int(cleaned), 0
                 else:
-                    return datetime.time(20, 0)
-            else:
-                # Format tradycyjny 17:50 lub 17.50
-                parts = val.strip().replace(".", ":").split(":")
-                h = int(parts[0])
-                m = int(parts[1]) if len(parts) > 1 and parts[1] else 0
+                    raise ValueError
 
             if 0 <= h <= 23 and 0 <= m <= 59:
                 return datetime.time(h, m)
