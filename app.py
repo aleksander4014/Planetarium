@@ -216,13 +216,16 @@ with tab_planets:
         st.markdown("---")
         
         # Tabela współrzędnych
-        def style_visibility(val):
+       def style_visibility(val):
             color = '#10b981' if 'Widoczny' in str(val) else '#ef4444'
             return f'color: {color}; font-weight: bold;'
 
-        styled_df = df_planets.drop(columns=['Widoczny']).style.applymap(
-            style_visibility, subset=['Status']
-        )
+        # Pandas 2.1+ używa .map() zamiast przestarzałego .applymap()
+        styler = df_planets.drop(columns=['Widoczny']).style
+        if hasattr(styler, 'map'):
+            styled_df = styler.map(style_visibility, subset=['Status'])
+        else:
+            styled_df = styler.applymap(style_visibility, subset=['Status'])
         st.dataframe(styled_df, use_container_width=True)
         
         # Szybka interpretacja dla automatyka teleskopu
