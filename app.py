@@ -137,10 +137,8 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("""
-    **Profil inżynierski:**
-    - 📐 Geometria sferyczna & Astrometria
-    - 🤖 Automatyka napędów montażu Alt-Az
-    - 🐍 Python / Streamlit / REST API
+    **Profil:**
+    - "[LinkedIn](https://www.linkedin.com/in/aleksander-pelka/)"
     """)
 
 # ==============================================================================
