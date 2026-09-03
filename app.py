@@ -96,7 +96,7 @@ CHORZOW_ELEVATION = 320       # Wysokość n.p.m. [m] (Wzgórze Parku Śląskieg
 # PASEK BOCZNY - PARAMETRY I KLUCZ API
 # ==============================================================================
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/NASA_logo.svg/300px-NASA_logo.svg.png", width=100)
+#    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/NASA_logo.svg/300px-NASA_logo.svg.png", width=100)
     st.title("⚙️ Parametry Stacji")
     st.caption("Stacja: **Planetarium Śląskie, Chorzów**")
     
