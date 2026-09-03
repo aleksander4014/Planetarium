@@ -138,7 +138,8 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("""
     **Profil:**
-    - "[LinkedIn](https://www.linkedin.com/in/aleksander-pelka/)"
+    - [LinkedIn](https://www.linkedin.com/in/aleksander-pelka/)
+    - [e-mail](mailto:aleksander-pelka@outlook.com)
     """)
 
 # ==============================================================================
